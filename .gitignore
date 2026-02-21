@@ -1,0 +1,17 @@
+# Maven
+target/
+*.class
+
+# Allure
+allure-results/
+allure-report/
+.allure/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.DS_Store
+
+# Playwright browser binaries
+/ms-playwright/
