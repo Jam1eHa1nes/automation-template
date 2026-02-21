@@ -2,6 +2,10 @@
 target/
 *.class
 
+# Test artefacts
+target/videos/
+target/har/
+
 # Allure
 allure-results/
 allure-report/
