@@ -8,13 +8,16 @@ import io.qameta.allure.Allure;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Hooks run before/after each scenario.
- * - @Before : starts the browser (passes scenario name for video/HAR file naming)
- * - @After  : attaches screenshot on failure, video and HAR if enabled, then closes the browser
+ * - @Before : starts the browser
+ * - @After  : attaches screenshot on failure, failed network calls if any,
+ *             and video if enabled, then closes the browser
  */
 public class Hooks {
 
@@ -29,11 +32,11 @@ public class Hooks {
             attachScreenshot("Failure Screenshot");
         }
 
-        // Close browser first — Playwright finalises video/HAR files on context close
+        // Close browser first — Playwright finalises the video file on context close
         DriverManager.quitDriver();
 
+        attachFailedNetworkCalls();
         attachVideo();
-        attachHar(scenario.getName());
     }
 
     // -------------------------------------------------------------------------
@@ -49,12 +52,25 @@ public class Hooks {
         }
     }
 
+    private void attachFailedNetworkCalls() {
+        List<String> failures = DriverManager.getFailedNetworkCalls();
+        if (failures == null || failures.isEmpty()) return;
+
+        StringBuilder log = new StringBuilder();
+        log.append("Failed Network Calls (4xx / 5xx)\n");
+        log.append("=".repeat(50)).append("\n\n");
+        failures.forEach(entry -> log.append(entry).append("\n"));
+
+        byte[] bytes = log.toString().getBytes(StandardCharsets.UTF_8);
+        Allure.addAttachment("Failed Network Calls", "text/plain",
+                new ByteArrayInputStream(bytes), "txt");
+    }
+
     private void attachVideo() {
         Path videoPath = DriverManager.getVideoPath();
         if (videoPath == null) return;
 
         try {
-            // Playwright writes the video with a generated UUID filename — find it
             Path videoDir = videoPath.getParent();
             if (!Files.exists(videoDir)) return;
 
@@ -70,17 +86,6 @@ public class Hooks {
             }
         } catch (Exception e) {
             System.err.println("Failed to attach video: " + e.getMessage());
-        }
-    }
-
-    private void attachHar(String scenarioName) {
-        Path harPath = DriverManager.getHarPath();
-        if (harPath == null || !Files.exists(harPath)) return;
-
-        try (InputStream is = Files.newInputStream(harPath)) {
-            Allure.addAttachment("Network (HAR) - " + scenarioName, "application/json", is, "json");
-        } catch (Exception e) {
-            System.err.println("Failed to attach HAR: " + e.getMessage());
         }
     }
 }
